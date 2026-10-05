@@ -1,0 +1,62 @@
+name: School Management V5 APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Extract ONLY V5 ZIP
+        run: |
+          set -e
+          test -f school_management_v6_final.zip
+          rm -rf v6_project
+          mkdir -p v6_project
+          unzip -q school_management_v6_final.zip -d v6_project
+
+      - name: Find Flutter project
+        run: |
+          set -e
+          PUBSPEC=$(find v6_project -type f -name pubspec.yaml -print -quit)
+          test -n "$PUBSPEC"
+          APP_DIR=$(dirname "$PUBSPEC")
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+          test -f "$APP_DIR/lib/main.dart"
+
+      - name: Generate Android
+        run: |
+          cd "$APP_DIR"
+          flutter create . --platforms=android --org=com.schoolmanagement
+
+      - name: Get dependencies
+        run: |
+          cd "$APP_DIR"
+          flutter pub get
+
+      - name: Build V5 APK
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          cd "$APP_DIR"
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=https://yeqpkotyeqvajxanlzpj.supabase.co \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: school-management-v5-final-apk
+          path: ${{ env.APP_DIR }}/build/app/outputs/flutter-apk/app-release.apk
