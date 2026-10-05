@@ -1,0 +1,60 @@
+name: School Management V7 APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Extract V7 source
+        run: |
+          set -e
+          rm -rf build_source
+          mkdir build_source
+
+          unzip -q school_management_v7_fixed.zip -d build_source
+
+          test -f build_source/pubspec.yaml
+          test -f build_source/lib/main.dart
+
+          echo "V7 source found successfully."
+
+      - name: Generate Android project
+        working-directory: build_source
+        run: |
+          flutter create . \
+            --platforms=android \
+            --org=com.schoolmanagement
+
+      - name: Get dependencies
+        working-directory: build_source
+        run: flutter pub get
+
+      - name: Build V7 APK
+        working-directory: build_source
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=https://yeqpkotyeqvajxanlzpj.supabase.co \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+
+      - name: Upload V7 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: school-management-v7-apk
+          path: build_source/build/app/outputs/flutter-apk/app-release.apk
